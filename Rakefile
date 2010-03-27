@@ -12,7 +12,7 @@ begin
     gem.authors = ["Lars Gollnow"]
     gem.add_development_dependency "thoughtbot-shoulda"
     gem.files = Dir["{lib}/**/*", "{app}/**/*", "{config}/**/*"]
-    gem.add_dependency 'ding_dealer'
+    gem.add_dependency 'neo4j'
     # gem is a Gem::Specification... see http://www.rubygems.org/read/chapter/20 for additional settings
   end
 rescue LoadError
