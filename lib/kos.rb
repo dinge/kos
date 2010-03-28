@@ -17,7 +17,9 @@ module Kos
   end
 
   def self.hub_nodes
-    @kos_instance.initializer.hub_nodes
+    Neo4j::ref_node.koslet_hubs
+    # @kos_instance.initializer.hub_nodes
+    # or Neo4j::ref_node.koslet_hubs
   end
 
 
@@ -109,10 +111,9 @@ module Kos
       end
 
       def init_koslet_hub_node
-        unless hub_node = Neo4j.ref_node.koslet_hubs.find { |node| node[:name] == name }
-          Neo4j.ref_node.koslet_hubs << (hub_node = Kos::Koslet::HubNode.new(:name => name))
+        unless @hub_node = Neo4j.ref_node.koslet_hubs.find { |node| node[:name] == name }
+          Neo4j.ref_node.koslet_hubs << (@hub_node = Kos::Koslet::HubNode.new(:name => name))
         end
-        @hub_node = hub_node
         extend(KosletHubClassExtension)
       end
 
