@@ -1,3 +1,5 @@
+# require 'active_support/dependencies'
+
 module Kos
 
   def self.instance
@@ -36,22 +38,32 @@ module Kos
 
   class Initializer
 
-    CosletsPath = "app/kos/" # there will be later more of those, also for better code sharing and distribution
+    KosletsPath = "app/kos/" # there will be later more of those, also for better code sharing and distribution
 
     def initialize
+      add_kos_root_to_load_paths
       extend_reference_node
       @koslet_modules = load_koslets
       post_process_koslet_modules
       @hub_nodes = []
     end
 
+    def add_kos_root_to_load_paths
+      # ActiveSupport::Dependencies.load_paths << File.expand_path('app')
+      $LOAD_PATH << File.expand_path('app')
+    end
+
     def load_koslets
-      Dir['%s/*/*.rb' % File.expand_path(CosletsPath)].map do |koslet_file|
-        require koslet_file
-        koslet_module = ('Kos::%s' % File.basename(koslet_file, '.rb').classify).constantize
-        koslet_module.instance_variable_set(:@koslet_file, koslet_file)
-        koslet_module
-      end
+      Dir['%s/*/*.rb' % File.expand_path(KosletsPath)].map do |koslet_file|
+        file_basename = File.basename(koslet_file, '.rb')
+        if file_basename == File.dirname(koslet_file).match(/^.*\/kos\/([\w]+)$/)[1] # only load module root
+          # ActiveSupport::Dependencies.require_or_load(koslet_file)
+          load(koslet_file)
+          koslet_module = ('Kos::%s' % file_basename.classify).constantize
+          koslet_module.instance_variable_set(:@koslet_file, koslet_file)
+          koslet_module
+        end
+      end.compact
     end
 
     def koslets
@@ -64,6 +76,7 @@ module Kos
 
     def post_process_koslet_modules
       @koslet_modules.each do |koslet_module|
+        koslet_module.extend(ActiveSupport::Autoload)
         koslet_module.extend(Koslet::KosletExtensions)
       end
       @koslet_modules.each do |koslet_module|
@@ -99,13 +112,15 @@ module Kos
 
       def init_without_engine
         return if const_defined?('Engine')
-        lib_path = File.join(File.dirname(koslet_file), 'lib')
+        lib_path = Pathname.new( File.dirname(koslet_file) ).join('lib').to_s
+        # ActiveSupport::Dependencies.load_paths.unshift(lib_path)
         $LOAD_PATH.unshift(lib_path)
+        extend ActiveSupport::Autoload
 
         Dir['%s/*.rb' % lib_path].each do |lib_file|
-          module_eval do
-            part = File.basename(lib_file, '.rb')
-            autoload part.classify.to_sym, part
+          part = File.basename(lib_file, '.rb')
+          class_eval do
+            autoload part.classify.to_sym, lib_file
           end
         end
       end
@@ -114,7 +129,7 @@ module Kos
         unless @hub_node = Neo4j.ref_node.koslet_hubs.find { |node| node[:name] == name }
           Neo4j.ref_node.koslet_hubs << (@hub_node = Kos::Koslet::HubNode.new(:name => name))
         end
-        extend(KosletHubClassExtension)
+        extend KosletHubClassExtension
       end
 
     end
@@ -123,8 +138,9 @@ module Kos
 
     class HubNode
       include Neo4j::NodeMixin
-      has_one(:reference_node)
-      property :name
+      has_one   :reference_node
+      property  :name
+      index     :name
     end
   end
 
@@ -133,7 +149,7 @@ module Kos
 
   module ReferenceNodeClassExtension
     def self.included(base)
-      base.has_n(:koslet_hubs)
+      base.has_n :koslet_hubs
     end
   end
 
@@ -147,6 +163,6 @@ module Kos
 
 end
 
-Kos.io = Kos.instance
 
+Kos.io = Kos.instance
 p Kos.io
